@@ -1,0 +1,6 @@
+# 认证文件含 token，绝不提交
+*.json
+!tests/fixtures/*.json
+*.bak
+*.before-cpa-*
+__pycache__/
