@@ -1,5 +1,7 @@
 # cpa2magpie-workbuddy
 
+> 现在也支持 **ZCode**：`cpa2magpie_zcode.py`，见下方「ZCode」一节。
+
 把 [CLIProxyAPI (CPA)](https://github.com/router-for-me/CLIProxyAPI) 里 WorkBuddy 插件生成的认证文件（`workbuddy-<uid>.json`），转进 [magpie](https://github.com/yetone/magpie) 的 `plugin-auth.json`，不用在 magpie 里逐个重新登录。
 
 ## 为什么需要它
@@ -50,3 +52,40 @@ WorkBuddy 每次刷新都会换一个新的 refresh token。CPA 和 magpie 如�
 
 - 只用合成数据测过，CPA 插件真实文件的字段名还没确认
 - 插件不支持 magpie 内置 WorkBuddy 的每日签到、积分统计（见插件 README）
+
+
+---
+
+# ZCode：CPA → magpie
+
+把 CPA 的 ZCode 插件（[lengjingxu/CLIProxyAPI-ZCode](https://github.com/lengjingxu/CLIProxyAPI-ZCode)）的认证文件（auth 目录里以 `zcode` 开头的 JSON，内容是 `{"type":"zcode","api_key":"<id>.<secret>",...}`）转进 magpie。
+
+- magpie 侧用社区插件 `@magpie-community/opencode-zcode-auth`，provider id `zcode`
+- 写成插件「GLM Coding Plan API key」登录的同款条目：`{"type":"api","key":"<id>.<secret>","metadata":{"site":"zai|bigmodel"}}`；第一个账号在 `zcode`，后面的在 `zcode#<slot>`
+- **API key 不会轮换**，所以和 WorkBuddy 不同：CPA 里的文件可以留着，两边同时用同一个 key（共用额度）。不想共用就移走
+
+## 使用步骤
+
+1. `magpie plugin add @magpie-community/opencode-zcode-auth`（装过就跳过）
+2. 退出 magpie
+3. 预览：
+   ```bash
+   python3 cpa2magpie_zcode.py ~/cli-proxy-api/auths/zcode*.json --dry-run
+   ```
+   看输出里的 `site=` 对不对。文件里没有 `base_url` 时，CPA 实际用的是 `config.yaml` 里 `plugins.configs.zcode.base_url`（默认 `api.z.ai`）；那里写的是 `open.bigmodel.cn` 的话，加 `--site bigmodel`
+4. 正式写入（Docker 同样用 `--target`）：
+   ```bash
+   python3 cpa2magpie_zcode.py ~/cli-proxy-api/auths/zcode*.json
+   ```
+5. 启动 magpie，在 Usage 里能看到 GLM Coding Plan 的额度就说明成功
+
+## 行为说明
+
+- 同一个 key 重跑会覆盖，不重复添加；写前备份、原子写入、0600，和 WorkBuddy 脚本一样
+- 字段名兼容 `api_key/apiKey/api-key/apikey/key/token`、`base_url/baseUrl/base-url`（与 CPA 插件一致）
+- 测试：`python3 tests/test_zcode.py`
+
+## 已知限制
+
+- 只转 API key。CPA 内置的 `zai` OAuth 登录（`-zai-login`）存的是另一种格式，没有覆盖；遇到时让执行 agent 汇报字段名
+- 用 key 登录时，插件的 Start Plan（免费额度）和赠送套餐的识别依赖 ZCode 会话 token，key 登录多半拿不到，基本只走 Coding Plan
